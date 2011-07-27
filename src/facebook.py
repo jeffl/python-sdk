@@ -41,14 +41,17 @@ import urllib
 # Find a JSON parser
 try:
     import json
+    _encode_json = lambda s: json.dumps(s)
     _parse_json = lambda s: json.loads(s)
 except ImportError:
     try:
         import simplejson
+        _encode_json = lambda s: simplejson.dumps(s)
         _parse_json = lambda s: simplejson.loads(s)
     except ImportError:
         # For Google AppEngine
         from django.utils import simplejson
+        _encode_json = lambda s: simplejson.dumps(s)
         _parse_json = lambda s: simplejson.loads(s)
 
 
@@ -82,6 +85,11 @@ class GraphAPI(object):
     """
     def __init__(self, access_token=None):
         self.access_token = access_token
+
+    def batch_request(self,requests):
+        """Wraps multiple request into one API call"""
+        assert self.access_token, "Batch operations require an access token"
+        return self.request("/", { 'batch': _encode_json(requests), 'method': 'post'})
 
     def get_object(self, id, **args):
         """Fetchs the given object from the graph."""
@@ -174,9 +182,14 @@ class GraphAPI(object):
             response = _parse_json(file.read())
         finally:
             file.close()
-        if response.get("error"):
-            raise GraphAPIError(response["error"]["type"],
+       
+        try:
+            if response.get("error"):
+                raise GraphAPIError(response["error"]["type"],
                                 response["error"]["message"])
+        except AttributeError:
+            pass
+
         return response
 
 
